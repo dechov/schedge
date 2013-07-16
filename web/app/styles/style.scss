@@ -1,0 +1,21 @@
+@import "bootstrap-sass/lib/bootstrap";
+
+html, body {
+    height: 100%;
+}
+body {
+    margin: 1em 1em 4em;
+}
+
+.event {
+    fill: hsl(220, 80%, 60%);
+}
+
+.axis path, .axis line {
+    stroke: hsl(220, 60%, 50%);
+    stroke-width: 1;
+    fill: none;
+    shape-rendering: crispEdges;
+    pointer-events: none;
+}
+
