@@ -1,5 +1,5 @@
 <h3>{{model.title}}</h3>
-<div class="source">Source: <a {{bindAttr href="model.source"}} target="_blank">{{model.source}}</a></div>
+<div class="source">Source: <a {{bindAttr href="model.source.url"}} target="_blank">{{model.source.url}}</a> ({{model.source.description}})</div>
 <svg />
 <div class="description">{{{view.description}}}</div>
 
