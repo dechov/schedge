@@ -58,40 +58,36 @@ App.TimelinesTimelineView = Em.View.extend({
   templateName: 'timeline',
   classNames: 'timeline',
 
-  didInsertElement: function() {
-    var self = this;
+  now: 2013,
+  margin: { top: 52, right: 32, bottom: 36, left: 32 },
+  width: function() {
+    return 960 - this.get('margin.left') - this.get('margin.right');
+  }.property('margin'),
+  height: function() {
+    return 100 - this.get('margin').top - this.get('margin').bottom;
+  }.property('margin'),
+  eventsBinding: 'controller.model.events',
 
-    var now = 2013;
-
-    var events = this.get('controller.model.events');
-    var margin = { top: 52, right: 32, bottom: 36, left: 32 };
-    var width = 960 - margin.left - margin.right,
-        height = 100 - margin.top - margin.bottom;
-
-    var svg = d3.select(this.$('svg').get(0))
-      .attr("width", width + margin.left + margin.right)
-      .attr("height", height + margin.top + margin.bottom)
-    .append("g")
-      .attr("transform", 'translate(' + margin.left + ', ' + margin.top + ')');
-
-    var timeScale = d3.scale.linear()
-      .domain([d3.min(events, function(d) { return d.get('median'); }), now])
-      .range([0, width]);
-
-    var timeAgoScale = d3.scale.log()
+  timeScale: function() {
+    var now = this.get('now'),
+        width = this.get('width');
+    return d3.scale.log()
       .domain([now - -999, now - 2003])
       .range([0, width]);
-    tas = timeAgoScale
+  }.property('now'),
 
-    var timeAxis = d3.svg.axis()
-      .scale(timeAgoScale)
+  timeAxis: function() {
+    var now = this.get('now'),
+        timeScale = this.get('timeScale');
+    return d3.svg.axis()
+      .scale(timeScale)
       .orient('bottom')
       .tickFormat(function(value) {
         var year = now - value;
         return year > 0 ? year.toString() : (-1 * year + 1).toString() + ' BC';
       })
       .tickValues(function() {
-        return timeAgoScale.ticks().filter(function(tick, i) {
+        return timeScale.ticks().filter(function(tick, i) {
           return !(i % 3);
         }).map(function(value) {
           var roundingPower = Math.floor(Math.log(value * 3/2) / Math.log(10));
@@ -99,29 +95,75 @@ App.TimelinesTimelineView = Em.View.extend({
           var roundingFactor = Math.pow(10, roundingPower);
           year = Math.round(year / roundingFactor) * roundingFactor;
           return now - year;
-        }).concat(timeAgoScale.domain());
+        }).concat(timeScale.domain());
       });
-     
-    var event_selection = svg.append('g')
-        .attr('class', 'events')
-      .selectAll('.event')
-        .data(events);
+  }.property('timeScale'),
 
-    event_selection.enter().append('rect')
+  representData: function(dataSelection) {
+    var self = this,
+        now = this.get('now'),
+        timeScale = self.get('timeScale');
+
+    dataSelection.enter().append('rect')
       .attr('class', 'event')
-      .attr('x', function(d) {
+      /*.attr('x', function(d) {
         var timeAgo = now - d.get('median');
         var timeAgoStart = timeAgo + d.get('resolution')/365.25/2;
-        return timeAgoScale(timeAgoStart);
+        return timeScale(timeAgoStart);
       })
       .attr('width', function(d) {
         var timeAgo = now - d.get('median');
         var timeAgoStart = timeAgo - d.get('resolution')/365.25/2;
         var timeAgoEnd = timeAgoStart + d.get('resolution')/365.25;
-        return timeAgoScale(timeAgoStart) - timeAgoScale(timeAgoEnd);
-      })
+        return timeScale(timeAgoStart) - timeScale(timeAgoEnd);
+      })*/
       .attr('y', -24)
       .attr('height', 24)
+
+    dataSelection  // update
+      .transition()
+      .attr('x', function(d) {
+        var timeAgo = now - d.get('median');
+        var timeAgoStart = timeAgo + d.get('resolution')/365.25/2;
+        return timeScale(timeAgoStart);
+      })
+      .attr('width', function(d) {
+        var timeAgo = now - d.get('median');
+        var timeAgoStart = timeAgo - d.get('resolution')/365.25/2;
+        var timeAgoEnd = timeAgoStart + d.get('resolution')/365.25;
+        return timeScale(timeAgoStart) - timeScale(timeAgoEnd);
+      });
+  },
+
+  didInsertElement: function() {
+    var self = this,
+        margin = this.get('margin'),
+        width = this.get('width'),
+        height = this.get('height'),
+        timeAxis = this.get('timeAxis');
+
+    var svg = d3.select(this.$('svg').get(0))
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+      .attr("transform", 'translate(' + margin.left + ', ' + margin.top + ')');
+
+    /*var timeScale = d3.scale.linear()
+      .domain([d3.min(events, function(d) { return d.get('median'); }), now])
+      .range([0, width]);*/
+
+    var zoom = d3.behavior.zoom()
+      .on('zoom', function() {
+        d3.select('.axis').call(timeAxis);
+        self.representData(svg.selectAll('.event').data(self.get('events')));
+      });
+     
+    var event_selection = svg.append('g')
+        .attr('class', 'events')
+      .selectAll('.event')
+        .data(this.get('events'));
+
+    self.representData(event_selection);
 
     svg.append('rect')
       .attr('class', 'mousetrap')
@@ -130,18 +172,18 @@ App.TimelinesTimelineView = Em.View.extend({
       .attr('width', width)
       .attr('height', 24)
       .attr('y', -24)
+      .call(zoom)
       .on('mousemove', function(d) {
         var x = d3.mouse(this)[0];
-        var timeAgo = timeAgoScale.invert(x);
-        var description = events.filter(function(event) {
-          return event.get('median') === Math.round(now - timeAgo);
+        var timeAgo = self.get('timeScale').invert(x);
+        var description = self.get('events').filter(function(event) {
+          return event.get('median') === Math.round(self.get('now') - timeAgo);
         })/*.forEach(function(event) {
           self.set('description', '%@<br/>%@ &mdash; %@'.fmt(self.get('description'), event.get('year'), event.get('description')))
         });*/
         .map(function(d) { return '%@ &mdash; %@'.fmt(d.get('year'), d.get('description')); })
         .join('<br/>');
         self.set('description', description);
-
       });
 
     svg.append('g')
