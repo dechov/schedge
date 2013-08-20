@@ -6,20 +6,10 @@ var App = window.App = Em.Application.create({
   location: 'hash'
 });
 
-/* Order and include as you please. */
-// require('scripts/routes/*');
-// require('scripts/controllers/*');
-// require('scripts/models/*');
-// require('scripts/views/*');
-
 App.Router.map(function () {
   this.resource('timelines', { path: '/' }, function() {
     this.route('timeline', { path: '/:group/:id' });
   });
-});
-
-App.ApplicationView = Em.View.extend({
-  classNames: 'application'
 });
 
 App.TimelinesIndexRoute = Em.Route.extend({
@@ -35,25 +25,20 @@ App.TimelinesTimelineRoute = Em.Route.extend({
   model: function(params) {
     return App.Timeline.find(params.group, params.id);
   },
-
   serialize: function(model) {
     return { group: model.group, id: model.id };
   }
 });
 
 
-/*
-App.TimelineController = Em.Controller.extend({
-  init: function() {
-    this._super();
-    this.set('observation', App.Event.create({
-      median: 1953,
-      resolution: 365,
-      description: 'sticks and balls'
-    }));
-  }
-});*/
-  
+App.ApplicationView = Em.View.extend({
+  classNames: 'application'
+});
+
+function BC(year) {
+  return -year + 1;
+}
+
 App.TimelinesTimelineView = Em.View.extend({
   templateName: 'timeline',
   classNames: 'timeline',
@@ -70,9 +55,10 @@ App.TimelinesTimelineView = Em.View.extend({
 
   timeScale: function() {
     var now = this.get('now'),
+        domain = [BC(1000), 2003],
         width = this.get('width');
-    return d3.scale.log()
-      .domain([now - -999, now - 2003])
+    return d3.scale.log()  // Actually a time *ago* (negative log) scale
+      .domain(domain.map(function(year) { return now - year; }))
       .range([0, width]);
   }.property('now'),
 
@@ -87,8 +73,9 @@ App.TimelinesTimelineView = Em.View.extend({
         return year > 0 ? year.toString() : (-1 * year + 1).toString() + ' BC';
       })
       .tickValues(function() {
+        // changes in v3.2.5 because of https://github.com/mbostock/d3/commit/595547389b59f537c675b0d2664fa505ee944bca
         return timeScale.ticks().filter(function(tick, i) {
-          return !(i % 3);
+          return !!(i % 2);
         }).map(function(value) {
           var roundingPower = Math.floor(Math.log(value * 3/2) / Math.log(10));
           var year = now - value;
